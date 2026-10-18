@@ -1,0 +1,525 @@
+```html
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกมเก็บดาวหลบอัศวินหุ่นยนต์ (Star Catcher & Robot Knight)</title>
+    <!-- โหลด Tailwind CSS สำหรับจัดโครงสร้าง UI ให้สวยงาม -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- โหลดฟอนต์ภาษาไทย Kanit ให้เข้ากับเด็กป.6 -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+            touch-action: manipulation;
+        }
+
+        /* ตกแต่ง Canvas ให้ดูเป็นหน้าจอเกมยุคใหม่ */
+        #gameCanvas {
+            background: linear-gradient(to bottom, #0f172a, #1e1b4b);
+            border: 4px solid #818cf8;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 20px rgba(129, 140, 248, 0.4);
+            border-radius: 1rem;
+        }
+
+        /* ปุ่มกดทัชสกรีนสำหรับหน้าจอมือถือ/แท็บเล็ต */
+        .touch-btn {
+            user-select: none;
+            -webkit-user-select: none;
+            active: scale(0.95);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 text-white select-none">
+
+    <!-- หัวข้อเกมสำหรับสื่อการเรียนการสอน -->
+    <header class="text-center mb-3">
+        <h1 class="text-2xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-cyan-300 drop-shadow-md">
+            ⭐ เกมเก็บดาวหลบอัศวินหุ่นยนต์ 🤖
+        </h1>
+        <p class="text-xs sm:text-sm text-indigo-200 mt-1">
+            สื่อการเรียนรู้เทคโนโลยี (วิทยาการคำนวณ) สำหรับชั้นประถมศึกษาปีที่ 6
+        </p>
+    </header>
+
+    <!-- คอนเทนเนอร์หลักของเกม -->
+    <div class="relative flex flex-col items-center w-full max-w-lg">
+        
+        <!-- แถบแสดงคะแนน (Score) และพลังชีวิต (Lives) -->
+        <div class="w-full bg-slate-900/80 backdrop-blur border-2 border-indigo-500/50 rounded-t-xl p-3 flex justify-between items-center shadow-lg">
+            <div class="flex items-center space-x-2">
+                <span class="text-2xl">⭐</span>
+                <div>
+                    <div class="text-xs text-indigo-300">คะแนน (Score)</div>
+                    <div id="scoreText" class="text-xl sm:text-2xl font-black text-yellow-400">0</div>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <div>
+                    <div class="text-xs text-indigo-300 text-right">พลังชีวิต (Lives)</div>
+                    <div id="livesContainer" class="flex space-x-1 text-xl sm:text-2xl">
+                        ❤️ ❤️ ❤️
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- หน้าจอวาดเกม (Canvas) -->
+        <canvas id="gameCanvas" width="480" height="520" class="w-full h-auto max-h-[60vh] object-contain rounded-b-none"></canvas>
+
+        <!-- แผงควบคุมด้วยการสัมผัส (สำหรับอุปกรณ์ทัชสกรีน) -->
+        <div class="w-full bg-slate-900/90 border-2 border-t-0 border-indigo-500/50 rounded-b-xl p-3 flex justify-between items-center gap-4">
+            <button id="btnLeft" class="touch-btn flex-1 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold py-3 rounded-lg text-lg flex items-center justify-center shadow-lg border-b-4 border-indigo-800">
+                ◀ ซ้าย (Left)
+            </button>
+            <div class="text-xs text-center text-indigo-300 hidden sm:block px-2">
+                กดลูกศร ◄ ► <br>บนคีย์บอร์ด
+            </div>
+            <button id="btnRight" class="touch-btn flex-1 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold py-3 rounded-lg text-lg flex items-center justify-center shadow-lg border-b-4 border-indigo-800">
+                ขวา (Right) ▶
+            </button>
+        </div>
+
+        <!-- หน้าต่างป๊อบอัพ Start / Game Over -->
+        <div id="overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md rounded-xl flex flex-col items-center justify-center p-6 text-center z-10 transition-all">
+            <div id="overlayIcon" class="text-6xl mb-3 animate-bounce">🚀</div>
+            <h2 id="overlayTitle" class="text-2xl sm:text-3xl font-extrabold text-yellow-300 mb-2">พร้อมเริ่มเล่นเกมหรือยัง?</h2>
+            <p id="overlayDesc" class="text-sm text-indigo-200 mb-6 max-w-xs">
+                ช่วยฮีโร่เก็บดาว⭐เพื่อสะสมคะแนน และหลบอัศวินหุ่นยนต์🤖กับระเบิด💣ให้ได้นะ!
+            </p>
+            <button id="startBtn" class="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 active:scale-95 text-white font-black text-lg px-8 py-3 rounded-full shadow-xl border-b-4 border-green-800 transition">
+                ▶ เริ่มเล่นเกม
+            </button>
+        </div>
+    </div>
+
+    <!-- คำอธิบายสำหรับครูนำไปสอน -->
+    <footer class="mt-4 text-center text-xs text-indigo-300/80 max-w-md">
+        💡 <b>เกร็ดความรู้สำหรับนักเรียน ป.6:</b> เกมนี้สร้างด้วยหลักการ Loop (การทำงานซ้ำ), Conditional Statements (การตรวจสอบเงื่อนไขการชน) และ Coordinate System (พิกัด X, Y บน Canvas)
+    </footer>
+
+    <script>
+        // ==========================================
+        // 1. ระบบเสียงเอฟเฟกต์ (Audio Synthesizer)
+        // สร้างเสียงขึ้นมาจากโค้ด ไม่ต้องใช้ไฟล์ภายนอก
+        // ==========================================
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function playSound(type) {
+            if (!audioCtx) audioCtx = new AudioCtx();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'star') {
+                // เสียงเก็บดาว (เสียงแหลมสดใส สูงขึ้น)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'hit') {
+                // เสียงชนอุปสรรค (เสียงต่ำสั่น)
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.25);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'gameover') {
+                // เสียงจบเกม
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.6);
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                osc.start(now);
+                osc.stop(now + 0.6);
+            }
+        }
+
+        // ==========================================
+        // 2. กำหนดตัวแปรและสถานะเริ่มต้นของเกม
+        // ==========================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const scoreText = document.getElementById('scoreText');
+        const livesContainer = document.getElementById('livesContainer');
+        const overlay = document.getElementById('overlay');
+        const overlayIcon = document.getElementById('overlayIcon');
+        const overlayTitle = document.getElementById('overlayTitle');
+        const overlayDesc = document.getElementById('overlayDesc');
+        const startBtn = document.getElementById('startBtn');
+
+        // สถานะของเกม
+        let score = 0;
+        let lives = 3;
+        let isGameOver = false;
+        let isGameRunning = false;
+        let animationFrameId = null;
+
+        // ตัวแปรเก็บปุ่มที่ถูกกด
+        const keys = {
+            left: false,
+            right: false
+        };
+
+        // ==========================================
+        // 3. กำหนดตัวละครผู้เล่น (Player)
+        // ==========================================
+        const player = {
+            x: canvas.width / 2 - 25,
+            y: canvas.height - 65,
+            width: 50,
+            height: 50,
+            speed: 7,
+            dx: 0,
+            
+            // วาดผู้เล่น (ฮีโร่จิ๋วถือตะกร้า/โล่)
+            draw() {
+                ctx.save();
+                
+                // วาดตัวฮีโร่ (วงกลม+ชุด)
+                ctx.fillStyle = '#38bdf8'; // สีฟ้าสดใส
+                ctx.beginPath();
+                ctx.arc(this.x + this.width/2, this.y + 25, 20, 0, Math.PI * 2);
+                ctx.fill();
+
+                // ตาฮีโร่
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(this.x + this.width/2 - 6, this.y + 20, 5, 0, Math.PI * 2);
+                ctx.arc(this.x + this.width/2 + 6, this.y + 20, 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(this.x + this.width/2 - 5, this.y + 20, 2, 0, Math.PI * 2);
+                ctx.arc(this.x + this.width/2 + 7, this.y + 20, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // ตะกร้า/จานรับดาวด้านบนหัว
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                ctx.roundRect(this.x - 2, this.y - 2, this.width + 4, 10, 5);
+                ctx.fill();
+
+                ctx.restore();
+            },
+
+            // อัปเดตตำแหน่งผู้เล่น
+            update() {
+                if (keys.left) this.x -= this.speed;
+                if (keys.right) this.x += this.speed;
+
+                // ป้องกันไม่ให้ผู้เล่นหลุดขอบหน้าจอ
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+            }
+        };
+
+        // Arrays สำหรับเก็บวัตถุที่ตกลงมา และอนุภาคเอฟเฟกต์
+        let items = [];
+        let particles = [];
+
+        // ==========================================
+        // 4. การจัดการวัตถุที่ตกลงมา (Items & Obstacles)
+        // ==========================================
+        class Item {
+            constructor() {
+                this.width = 36;
+                this.height = 36;
+                this.x = Math.random() * (canvas.width - this.width);
+                this.y = -this.height;
+                this.speed = 2 + Math.random() * 2 + (score * 0.1); // ความเร็วเพิ่มขึ้นตามคะแนน
+
+                // สุ่มประเภทของไอเท็ม (ดาว 60%, อัศวินหุ่นยนต์ 25%, ระเบิด 15%)
+                const rand = Math.random();
+                if (rand < 0.6) {
+                    this.type = 'star';
+                } else if (rand < 0.85) {
+                    this.type = 'robot';
+                } else {
+                    this.type = 'bomb';
+                }
+            }
+
+            // วาดไอเท็มตามประเภท
+            draw() {
+                ctx.save();
+                ctx.font = '28px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                if (this.type === 'star') {
+                    // วาดดาวเรืองแสง
+                    ctx.shadowColor = '#fde047';
+                    ctx.shadowBlur = 10;
+                    ctx.fillText('⭐', this.x + this.width/2, this.y + this.height/2);
+                } else if (this.type === 'robot') {
+                    // วาดอัศวินหุ่นยนต์
+                    ctx.shadowColor = '#94a3b8';
+                    ctx.shadowBlur = 5;
+                    ctx.fillText('🤖', this.x + this.width/2, this.y + this.height/2);
+                } else if (this.type === 'bomb') {
+                    // วาดระเบิด
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 8;
+                    ctx.fillText('💣', this.x + this.width/2, this.y + this.height/2);
+                }
+
+                ctx.restore();
+            }
+
+            // เคลื่อนที่ลงมา
+            update() {
+                this.y += this.speed;
+            }
+        }
+
+        // ระบบอนุภาคประกายดาวเวลาเก็บได้ (Particle Effect)
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 4 + 2;
+                this.speedX = (Math.random() - 0.5) * 6;
+                this.speedY = (Math.random() - 0.5) * 6;
+                this.color = color;
+                this.alpha = 1;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.alpha -= 0.03; // ค่อยๆ จางหายไป
+            }
+        }
+
+        // ฟังก์ชันสร้างประกายดาว
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 12; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        // ==========================================
+        // 5. ระบบปุ่มกดและควบคุม (Controls)
+        // ==========================================
+        // ตรวจจับการกดคีย์บอร์ด (ลูกศรซ้าย-ขวา)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+        });
+
+        // ตรวจจับการกดปุ่มสัมผัสบนหน้าจอมือถือ
+        const btnLeft = document.getElementById('btnLeft');
+        const btnRight = document.getElementById('btnRight');
+
+        const bindTouch = (elem, keyName) => {
+            elem.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyName] = true; });
+            elem.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyName] = false; });
+            elem.addEventListener('mousedown', () => { keys[keyName] = true; });
+            elem.addEventListener('mouseup', () => { keys[keyName] = false; });
+            elem.addEventListener('mouseleave', () => { keys[keyName] = false; });
+        };
+
+        bindTouch(btnLeft, 'left');
+        bindTouch(btnRight, 'right');
+
+        // ==========================================
+        // 6. การตรวจสอบการชน (Collision Detection)
+        // ==========================================
+        function checkCollision(rect1, rect2) {
+            return (
+                rect1.x < rect2.x + rect2.width &&
+                rect1.x + rect1.width > rect2.x &&
+                rect1.y < rect2.y + rect2.height &&
+                rect1.y + rect1.height > rect2.y
+            );
+        }
+
+        // ==========================================
+        // 7. วาดฉากหลังแบบมีดวงดาวกระพริบ (Background)
+        // ==========================================
+        const bgStars = Array.from({ length: 25 }, () => ({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: Math.random() * 2 + 1,
+            alpha: Math.random()
+        }));
+
+        function drawBackground() {
+            // ล้างหน้าจอด้วยสีมืดท้องฟ้า
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // วาดดาวฉากหลังกระพริบ
+            ctx.fillStyle = '#ffffff';
+            bgStars.forEach(star => {
+                star.alpha += (Math.random() - 0.5) * 0.05;
+                if (star.alpha < 0.2) star.alpha = 0.2;
+                if (star.alpha > 1) star.alpha = 1;
+
+                ctx.save();
+                ctx.globalAlpha = star.alpha;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        // ==========================================
+        // 8. ลูปหลักของเกม (Main Game Loop)
+        // ==========================================
+        let spawnTimer = 0;
+
+        function gameLoop() {
+            if (!isGameRunning) return;
+
+            // 1. วาดฉากหลัง
+            drawBackground();
+
+            // 2. อัปเดตและวาดผู้เล่น
+            player.update();
+            player.draw();
+
+            // 3. สุ่มสร้างไอเท็มตกลงมา
+            spawnTimer++;
+            if (spawnTimer % 45 === 0) { // ทุกๆ ~0.75 วินาที
+                items.push(new Item());
+            }
+
+            // 4. อัปเดตและวาดไอเท็มทั้งหมด
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+                item.update();
+                item.draw();
+
+                // ตรวจสอบเมื่อไอเท็มชนกับผู้เล่น
+                if (checkCollision(player, item)) {
+                    if (item.type === 'star') {
+                        // เก็บดาว: ได้คะแนน +1
+                        score += 1;
+                        scoreText.textContent = score;
+                        playSound('star');
+                        createExplosion(item.x + item.width/2, item.y + item.height/2, '#fde047');
+                    } else {
+                        // โดนอัศวินหุ่นยนต์หรือระเบิด: เสียพลังชีวิต -1
+                        lives -= 1;
+                        updateLivesUI();
+                        playSound('hit');
+                        createExplosion(item.x + item.width/2, item.y + item.height/2, '#ef4444');
+
+                        if (lives <= 0) {
+                            endGame();
+                        }
+                    }
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                // ลบไอเท็มที่ตกเลยขอบล่าง
+                if (item.y > canvas.height) {
+                    items.splice(i, 1);
+                }
+            }
+
+            // 5. อัปเดตและวาดเอฟเฟกต์อนุภาค
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+
+            // เรียกวนลูปต่อเนื่อง
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // อัปเดตการแสดงผลหัวใจพลังชีวิต
+        function updateLivesUI() {
+            let heartsHtml = '';
+            for (let i = 0; i < 3; i++) {
+                if (i < lives) {
+                    heartsHtml += '❤️ ';
+                } else {
+                    heartsHtml += '🖤 ';
+                }
+            }
+            livesContainer.innerHTML = heartsHtml;
+        }
+
+        // เริ่มเกมใหม่
+        function startGame() {
+            score = 0;
+            lives = 3;
+            items = [];
+            particles = [];
+            isGameOver = false;
+            isGameRunning = true;
+            
+            scoreText.textContent = score;
+            updateLivesUI();
+            player.x = canvas.width / 2 - player.width / 2;
+
+            overlay.classList.add('hidden');
+            
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        // จบเกม
+        function endGame() {
+            isGameRunning = false;
+            isGameOver = true;
+            playSound('gameover');
+
+            overlayIcon.textContent = '👾';
+            overlayTitle.textContent = 'จบการทำงาน! (GAME OVER)';
+            overlayTitle.className = 'text-2xl sm:text-3xl font-extrabold text-red-400 mb-2';
+            overlayDesc.innerHTML = `คะแนนรวมที่คุณทำได้คือ <span class="text-yellow-300 font-bold text-xl">${score}</span> คะแนน<br>ลองใหม่อีกครั้งเพื่อทำสถิติใหม่นะ!`;
+            startBtn.textContent = '🔄 เล่นใหม่อีกครั้ง';
+
+            overlay.classList.remove('hidden');
+        }
+
+        // ผูกการคลิกปุ่มเริ่มเกม
+        startBtn.addEventListener('click', startGame);
+
+        // วาดฉากแรกเพื่อความสวยงามก่อนเริ่มเล่น
+        drawBackground();
+        player.draw();
+    </script>
+</body>
+</html>
+```
